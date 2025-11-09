@@ -119,4 +119,4 @@ These targets reflect intended availability windows, not speculative feature pro
 
 This writeup consolidates the team’s current architecture and repository layout and aligns wording with the capstone documentation already shared with instructors and reviewers.
 
-Submitted By Bijay Prasai and Birochan Mainali 
+Submitted By Bijay Prasai On November 8, 2025.
