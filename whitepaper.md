@@ -1,122 +1,80 @@
- # Artha Network White Paper
-
-## Abstract
-
-Artha Network is a decentralized, AI-assisted escrow protocol that makes peer-to-peer transactions feel as safe as buying from a major marketplace. Funds are locked in smart contracts, disputes are triaged by an AI arbiter with human fallback, and evidence lives on immutable storage. The goal is a low-friction, low-cost trust layer for everyday deals such as used-vehicle sales, rentals, and freelance milestones.
+Here's the iOS app section, written to match the exact tone and depth of your existing whitepaper:
 
 ---
 
-## 1. Problem Statement
+## 3.4 iOS Application
 
-P2P commerce keeps growing while trust keeps shrinking. Informal trades and gig payments are riddled with fraud, chargebacks, and unclear recourse. Traditional escrow is priced and designed for high-value deals, not a $50 marketplace pickup or a $300 gig milestone. People need a non-custodial, affordable, and simple way to transact with strangers.
+The iOS application is the primary consumer-facing interface for Artha Network. While the protocol is chain-agnostic and accessible via web, the native iOS app targets the mainstream P2P seller — someone who lists on Facebook Marketplace or Craigslist, has no crypto background, and needs escrow to feel as simple as Venmo.
 
----
+### Design Philosophy
 
-## 2. Protocol Overview
+The app follows a **link-first, wallet-second** model. A buyer or seller initiates a deal from a chat or SMS by sharing a Blink link. The recipient taps it, reviews the deal terms, and funds the escrow — all without understanding what Solana is. Wallet creation and gas sponsorship happen silently in the background on first launch.
 
-**Artha Network** provides a non-custodial escrow with AI-assisted dispute resolution.
+Three principles govern every screen decision:
 
-* **Non-custodial custody**: Funds are held in program-owned vaults. Neither platform operators nor arbitrators can seize them without authorized state transitions.
-* **AI-assisted arbitration**: An off-chain arbiter service evaluates evidence bundles and issues a cryptographically signed ResolveTicket. A human reviewer can override during appeal windows.
-* **Stablecoin rails**: USDC for price stability and global reach.
-* **Accessible UX**: Link-first flows via Solana Actions and Blinks. Gas sponsorship removes the need for first-time SOL funding.
-* **Affordable and scalable**: Cheap L1 throughput and off-chain AI keep per-deal costs low so micro-escrow remains viable.
+- **No crypto jargon in user-facing copy.** "Funds held securely" not "USDC locked in program-owned vault." The technical reality is unchanged; the language is not.
+- **One primary action per screen.** Escrow flows are inherently multi-step. The app never presents two competing CTAs at the same time.
+- **Failure is recoverable.** Network errors, wallet creation failures, and disputed evidence uploads surface with a clear next step, never a dead end.
 
----
+### Core Screens and Flows
 
-## 3. Architecture
+**Onboarding**
+First-time launch creates an embedded MPC wallet silently using the Turnkey or Privy SDK. Users authenticate with Face ID or Apple Sign-In. No seed phrase is shown or required unless the user explicitly requests key export. SOL for gas is sponsored via a fee-payer backend so the user's first transaction requires zero funding.
 
-### 3.1 On-chain layer
+**Deal Creation**
+A seller fills in: item description, agreed price in USD, delivery method, and optional deadline. The app generates a Blink URL and a QR code. Both can be shared directly into iMessage, WhatsApp, or any chat. The on-chain deal is not created until the buyer funds — no wasted transactions.
 
-* **Solana program** written in Rust with Anchor IDL.
-* **State machine** for the deal lifecycle: `INIT → FUNDED → DELIVERED → DISPUTED → RESOLVED → RELEASED/REFUNDED`.
-* **Program-owned vaults** for custody of USDC (SPL Token-2022).
-* **Price snapshotting** using Pyth oracles at funding time.
-* **Signature gating** for resolution execution. Only allow-listed arbiter keys or human override keys can finalize.
+**Funding and Confirmation**
+The buyer opens the Blink link, reviews deal terms, and approves funding with Face ID. The app constructs and submits the `initiate_escrow` transaction, sponsored by the fee-payer service. A push notification confirms when the vault is funded and visible on-chain.
 
-### 3.2 Off-chain layer
+**Evidence Upload**
+Either party can upload evidence at any point: photos from the camera roll, documents from Files, or short video clips. Uploads are hashed client-side before transmission, dual-pinned to IPFS and Arweave via `storage-lib`, and the resulting CIDs are written on-chain. The UI shows upload status per file and flags any integrity check failures before submission.
 
-* **AI Arbiter Service** evaluates context plus evidence and signs a ResolveTicket (final action, rationale CID, confidence).
-* **Evidence storage** on Arweave and IPFS. Only CIDs are recorded on-chain.
-* **Actions and Blinks endpoints** return ready-to-sign transactions and support fee-payer policy.
-* **Notifications and jobs** manage deadlines, reminders, and escalations.
+**Dispute Flow**
+Either party can open a dispute during the `DELIVERED` window. The app prompts for a structured description (what went wrong, what resolution is expected) and pulls in already-uploaded evidence. The AI Arbiter result is surfaced as a plain-language summary with a confidence indicator. If confidence is below threshold, the UI shows an appeal option with a countdown timer for the human override window.
 
-### 3.3 Evidence, resolution, reputation
+**Notifications and Deadlines**
+APNs push notifications cover: deal funded, delivery confirmed, dispute opened, arbiter decision issued, and deadline warnings. A background task monitors on-chain state via the NestJS backend and fires notification jobs through the Redis queue. Users can configure notification preferences per deal category.
 
-* **Evidence** is uploaded off-chain, hashed, virus-scanned, dual-pinned, and referenced by CID on-chain.
-* **Resolution** occurs when the program verifies the ResolveTicket signature and enforces release, refund, or split.
-* **Reputation** records attestations after each deal, enabling portable trust across marketplaces.
+### Technical Stack
 
----
+| Layer | Choice | Rationale |
+|---|---|---|
+| Language | Swift 5.9, SwiftUI | Native performance, declarative UI, full iOS ecosystem access |
+| Wallet SDK | Turnkey / Privy embedded MPC | No seed phrase UX, Face ID auth, recoverable via cloud backup |
+| Solana RPC | `solana-swift` + custom RPC client | Transaction construction, signing, submission |
+| Networking | `URLSession` + async/await | Native, no Alamofire dependency overhead |
+| Evidence upload | REST calls to NestJS backend → `storage-lib` | Client never talks to Arweave/IPFS directly |
+| Local state | SwiftData (iOS 17+) | Caches deal state, evidence CIDs, notification preferences |
+| Push | APNs via NestJS notification job | Triggered by on-chain state change listeners |
+| Deep linking | Universal Links + custom `artha://` scheme | Blink URLs open directly into the correct deal screen |
 
-## 4. Deal Lifecycle
+### Wallet Architecture
 
-1. **Create**: Seller defines terms and deadlines; a deal ID and PDA are derived.
-2. **Fund**: Buyer deposits USDC into the program vault. The program snapshots USD price.
-3. **Deliver**: Seller delivers goods or services.
-4. **Release**: Buyer confirms and funds are released to the seller. If not, a dispute can be opened before the deadline.
-5. **Dispute**: Parties submit evidence; the AI arbiter returns a signed decision. Optional appeal to human reviewer.
-6. **Finalize**: Program executes the decision. Reputation attestations are emitted.
+The app uses an **embedded MPC wallet** rather than a WalletConnect integration. The decision is deliberate: requiring Phantom or Solflare creates a hard dependency on the user already being in crypto. MPC wallets (Turnkey, Privy) generate keys in secure enclaves, authenticate via biometrics, and are recoverable through the user's iCloud account or email — matching the mental model of Apple Pay, not MetaMask.
 
----
+For power users who want to bring their own wallet (Phantom, Backpack), WalletConnect v2 is supported as a secondary option. It is not the default path.
 
-## 5. Security and Trust Boundaries
+### Offline and Error Resilience
 
-* **Custody integrity**: Funds cannot move without valid state transitions and verified signatures.
-* **Keyed arbiters**: ResolveTickets must be signed with registered arbiter keys. Human override keys are managed separately.
-* **Immutability**: Evidence and rationale are referenced by cryptographic CIDs.
-* **Privacy by design**: Sensitive files may be client-side encrypted prior to upload. AI logs exclude raw PII.
+P2P deals happen in parking lots, driveways, and low-signal areas. The app handles this by:
 
----
+- Caching deal state locally in SwiftData so terms and evidence are readable offline.
+- Queuing evidence uploads and retrying on reconnection — uploads are idempotent since CIDs are content-addressed.
+- Showing the last known on-chain state with a staleness indicator when RPC calls fail.
+- Never blocking the evidence submission UI on network availability. Files are queued locally and flushed when connectivity returns.
 
-## 6. Repository Map
+### Security Considerations
 
-The organization currently includes the following repositories. Public versus private status is indicated for clarity.
+- Private keys never leave the secure enclave. Signing happens on-device.
+- Evidence files are hashed client-side before upload. The backend rejects any payload whose hash does not match the declared CID.
+- All API calls use short-lived JWTs issued at app launch. Tokens are stored in the iOS Keychain, not `UserDefaults`.
+- Jailbreak detection runs at launch. The app does not block on a jailbroken device but flags it in the session metadata sent to the backend.
 
-* **dev-infra** (Public): Dev containers, docker-compose, localnet bootstrap, environment templates, meta docs.
-* **web-app** (Public): End-user UI with wallet adapter. Talks to the actions-server for transaction generation.
-* **arbiter-service** (Public): AI pipeline that evaluates evidence and chat and emits a signed ResolveTicket (ed25519, CBOR payload).
-* **onchain-escrow** (Public): Escrow program that owns custody and lifecycle state machine on Solana.
-* **actions-server** (Public): Solana Actions and Blinks endpoints returning ready-to-sign transactions and enforcing fee-payer policy.
-* **core-domain** (Public): Pure TypeScript domain types and business helpers, zero IO.
-* **whitepaper** (Public): This document and related technical writeups.
-* **storage-lib** (Private): Arweave and IPFS abstraction, hashing, dual pinning, integrity verification.
-* **examples** (Private): Runnable end-to-end samples and Postman collections stitching published packages and endpoints.
-* **tickets-lib** (Private): ResolveTicket schema (zod), canonical CBOR encode and verify, ed25519 signing and verification.
-* **jobs-service** (Private): Deadlines, reminders, auto-escalations. Consumes webhooks and can trigger resolve or notifications.
-* **solana-kit** (Private): Thin, typed client for the escrow program and helpers for Actions and transaction building.
+### App Store and Distribution
+
+The MVP targets iOS 17+ to use SwiftData and the latest SwiftUI APIs without polyfill overhead. TestFlight distribution covers internal testing and a closed beta with selected marketplace communities. App Store submission targets the Finance category with a clear escrow use-case description. Given the stablecoin and crypto wallet components, the app will include the required financial services disclosure and comply with Apple's guidelines on cryptocurrency wallets (App Store Review Guideline 3.1.5(b)).
 
 ---
 
-## 7. Deployment Targets
-
-* **Public testnet availability by December 4, 2025.**
-* **Mainnet deployment target by May 2026**, pending audits, infra readiness, and operational runbooks.
-
-These targets reflect intended availability windows, not speculative feature promises.
-
----
-
-## 8. Interfaces and UX Summary
-
-* **Wallets**: Phantom, Solflare, Backpack via wallet adapter.
-* **Link-first**: Shareable Blinks for create, fund, dispute, and release.
-* **Evidence UX**: File uploads with CID confirmations and preview before submit.
-* **Status clarity**: Deal status badges, timers for dispute windows, and resolution rationale links.
-
----
-
-## 9. Glossary
-
-* **ResolveTicket**: Signed artifact issued by the AI arbiter or human reviewer with final action and rationale CID.
-* **CID**: Content identifier for immutable storage references.
-* **PDA**: Program Derived Address controlling program-owned vaults.
-* **Actions and Blinks**: Solana link flows that serialize transactions for one-click wallet previews.
-
----
-
-## 10. References
-
-This writeup consolidates the team’s current architecture and repository layout and aligns wording with the capstone documentation already shared with instructors and reviewers.
-
-Submitted By Bijay Prasai On November 8, 2025.
+Paste that directly after your `### 3.3 Evidence, resolution, reputation` block as `### 3.4 iOS Application`. It follows the same heading depth (`###`) and matches your existing table/bullet formatting style throughout.
