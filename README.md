@@ -115,7 +115,34 @@ Even capturing **0.1% of these markets** represents multi-billion-dollar volume.
 
 ---
 
-## 10. SWOT Analysis
+## 10. Security & Trust Model
+
+Artha Network's security posture is designed around the principle of **defense in depth** — multiple independent layers that each reduce risk on their own and compound when combined.
+
+### On-Chain Security
+- **Non-custodial vaults**: Funds are held in program-derived accounts (PDAs) governed by the smart contract, not by any team wallet or multisig. No single party can move funds outside the state machine.
+- **State machine enforcement**: Every transition (fund, dispute, release, refund) is validated on-chain. Invalid state changes are rejected at the instruction level.
+- **Anchor framework**: The Solana program uses Anchor's account validation macros, eliminating common Solana vulnerabilities (missing signer checks, account confusion, reinitialization attacks).
+- **Deterministic payouts**: Fee calculations use integer arithmetic with basis points (0–10,000) to avoid floating-point rounding errors. Payout logic is implemented as a pure function with no external dependencies.
+
+### Evidence Integrity
+- **Content-addressed storage**: Evidence is hashed client-side (SHA-256) before upload. CIDs are stored on-chain, creating an immutable link between the deal and its evidence.
+- **Dual-pin strategy**: Evidence is pinned to both IPFS (fast retrieval) and Arweave (permanent storage). Integrity is verified on fetch by recomputing the hash.
+- **Tamper detection**: Any modification to stored evidence changes its hash, which will not match the on-chain CID — making post-hoc tampering detectable.
+
+### Dispute Resolution Security
+- **Signed verdicts**: AI Arbiter decisions are encoded as canonical CBOR, signed with Ed25519, and verified on-chain before execution. A forged or tampered verdict will fail signature verification.
+- **Confidence gating**: Low-confidence AI decisions are automatically escalated to human review rather than executed, preventing unreliable automated outcomes.
+- **Replay protection**: Each verdict carries a nonce and expiration timestamp. The on-chain program rejects expired or replayed tickets.
+
+### Operational Security
+- **No stored private keys**: The backend never holds user private keys. Transaction signing happens in the user's wallet (browser extension or embedded MPC wallet).
+- **Rate limiting and input validation**: All API endpoints validate inputs with Zod schemas, enforce rate limits, and sanitize user-provided strings to prevent injection attacks.
+- **Fire-and-forget notifications**: Notification failures never block deal processing. They are wrapped in try/catch and logged for debugging without affecting the critical path.
+
+---
+
+## 11. SWOT Analysis
 **Strengths**: Decentralized, low-cost, AI arbitration, micro-escrow support.  
 **Weaknesses**: User education, early AI limitations, regulatory friction.  
 **Opportunities**: First-mover in micro-escrow, integrations into marketplaces, expansion to rentals/remittances.  
@@ -123,7 +150,7 @@ Even capturing **0.1% of these markets** represents multi-billion-dollar volume.
 
 ---
 
-## 11. Vision
+## 12. Vision
 Artha Network aims to become the **trust layer of the global P2P economy**.  
 In the future, escrow won’t stop at digital contracts. With external data integrations — from DMV ownership checks to blockchain IDs — Artha will make **real-world transactions auditable, verifiable, and fraud-proof**.
 
